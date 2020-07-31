@@ -1,18 +1,20 @@
 # -*- coding: utf-8 -*-
 import time
-
+# build-in package 
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import Dict
 from typing import List
 from typing import Union
+# vender package
+import pdb
 
 from poetry.core.packages import Dependency
 from poetry.core.packages import Package
 from poetry.core.packages import ProjectPackage
 from poetry.core.semver import Version
 from poetry.core.semver import VersionRange
-
+# package in  own package
 from .failure import SolveFailure
 from .incompatibility import Incompatibility
 from .incompatibility_cause import ConflictCause
@@ -50,6 +52,7 @@ class VersionSolver:
     ):
         self._root = root
         self._provider = provider
+        # lock 功能就是拿來指定 要哪個package的特定version
         self._locked = locked or {}
 
         if use_latest is None:
@@ -79,6 +82,7 @@ class VersionSolver:
 
         try:
             next = self._root.name
+            # 把 is_solved() 改成用 none 判斷是否結束
             while next is not None:
                 self._propagate(next)
                 next = self._choose_package_version()
@@ -126,6 +130,7 @@ class VersionSolver:
                     # decision level, so we clear [changed] and refill it with the
                     # newly-propagated assignment.
                     changed.clear()
+                    # 先對新製造出來的incompatibility其實也不一定是新製造出來的，就是先對root cause做propagate
                     changed.add(str(self._propagate_incompatibility(root_cause)))
                     break
                 elif result is not None:
@@ -263,6 +268,7 @@ class VersionSolver:
             # guaranteed to allow _propagate to produce more assignments.
             if (
                 previous_satisfier_level < most_recent_satisfier.decision_level
+                # cause 是 None 表示是 decision
                 or most_recent_satisfier.cause is None
             ):
                 self._solution.backtrack(previous_satisfier_level)
@@ -328,6 +334,7 @@ class VersionSolver:
         propagated by _propagate(), or None indicating that version solving is
         complete and a solution has been found.
         """
+        # 還沒滿足的正的 derivation
         unsatisfied = self._solution.unsatisfied
         if not unsatisfied:
             return
@@ -335,6 +342,7 @@ class VersionSolver:
         # Prefer packages with as few remaining versions as possible,
         # so that if a conflict is necessary it's forced quickly.
         def _get_min(dependency):
+            # 如果強制用最新的那就只有一個選擇
             if dependency.name in self._use_latest:
                 # If we're forced to use the latest version of a package, it effectively
                 # only has one version to choose from.
@@ -354,6 +362,8 @@ class VersionSolver:
                 return 1
 
             try:
+                # dependency 裡面有 constraint
+                # _provider.search_for 找符合的 candidate
                 return len(self._provider.search_for(dependency))
             except ValueError:
                 return 0
@@ -361,12 +371,21 @@ class VersionSolver:
         if len(unsatisfied) == 1:
             dependency = unsatisfied[0]
         else:
+            # pdb.set_trace()
             dependency = min(*unsatisfied, key=_get_min)
 
+        # 上面決定要 choose 哪一個 package
+        # type(locked) -> Package poetry.core.package.package.py
         locked = self._get_locked(dependency)
+        # 檢查lock是否符合constraint
+        pdb.set_trace()
+        # type(dependency.constraint) -> poetry.core.semver.version_range.VersionRange
+        #type(locked.version) =>
         if locked is None or not dependency.constraint.allows(locked.version):
             try:
+                # search_for() 會回傳 avalible List of poetry.core.Package
                 packages = self._provider.search_for(dependency)
+                #pdb.set_trace()
             except ValueError as e:
                 self._add_incompatibility(
                     Incompatibility([Term(dependency, True)], PackageNotFoundCause(e))
@@ -390,8 +409,11 @@ class VersionSolver:
             return dependency.name
 
         version = self._provider.complete_package(version)
+        pdb.set_trace()
 
+        # 下面是跟 mixology 一樣的 pin_in
         conflict = False
+        # 看 provider self._provider.incompatibilities_for
         for incompatibility in self._provider.incompatibilities_for(version):
             self._add_incompatibility(incompatibility)
 
@@ -446,7 +468,7 @@ class VersionSolver:
     def _get_locked(self, dependency):  # type: (Dependency) -> Union[Package, None]
         if dependency.name in self._use_latest:
             return
-
+        # dict.get(key) 就是取得與key對應的value
         locked = self._locked.get(dependency.name)
         if not locked:
             return

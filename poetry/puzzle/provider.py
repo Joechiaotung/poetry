@@ -62,7 +62,7 @@ class Provider:
         self._io = io
         self._env = env
         self._python_constraint = package.python_constraint
-        self._search_for = {}
+        self._search_for = {} # dictionary
         self._is_debugging = self._io.is_debug() or self._io.is_very_verbose()
         self._in_progress = False
         self._overrides = {}
@@ -101,6 +101,7 @@ class Provider:
         if dependency.is_root:
             return PackageCollection(dependency, [self._package])
 
+        # 所以_search_for就是一個暫存candidate的概念
         for constraint in self._search_for.keys():
             if (
                 constraint.name == dependency.name
@@ -110,6 +111,7 @@ class Provider:
                 packages = [
                     p
                     for p in self._search_for[constraint]
+                    # constraint.allows 檢查 candidate 是否符合 constraint
                     if dependency.constraint.allows(p.version)
                 ]
 
@@ -154,6 +156,7 @@ class Provider:
 
         return PackageCollection(dependency, packages)
 
+    # version control dependency from github 必須是git repo
     def search_for_vcs(self, dependency):  # type: (VCSDependency) -> List[Package]
         """
         Search for the specifications that match the given VCS dependency.
